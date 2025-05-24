@@ -113,8 +113,8 @@ Understanding how data flows through unloggarr's components helps with troublesh
 
 #### 1. **Web UI → MCPO**
 - **Protocol**: HTTP/HTTPS REST API calls
-- **Endpoint**: `http://your-unraid-ip:6970`
-- **Authentication**: Bearer token via `MCPO_AUTH_TOKEN`
+- **Endpoint**: Configured via `MCPO_BASE_URL`
+- **Authentication**: Standard HTTP authentication
 - **Data**: User requests for logs, analysis, notifications, system status
 
 #### 2. **MCPO → MCP Server**
@@ -178,48 +178,6 @@ View MCP-specific tool documentation at:
 http://your-unraid-ip:6970/mcp-unraid/tools
 ```
 
-### 🔍 **Data Tracing & Debugging**
-
-#### **Request Tracing**
-Monitor data flow with these endpoints:
-
-1. **Web UI Debug Console**:
-   ```javascript
-   // Browser console - view API calls
-   localStorage.setItem('debug', 'unloggarr:*')
-   ```
-
-2. **MCPO Request Logs**:
-   ```bash
-   # View MCPO request logs
-   curl http://your-unraid-ip:6970/api/debug/requests
-   ```
-
-3. **MCP Server Logs**:
-   ```bash
-   # View MCP server activity
-   curl http://your-unraid-ip:6970/mcp-unraid/logs
-   ```
-
-#### **Health Check Endpoints**
-Verify each component's health:
-
-```bash
-# Web UI Health
-curl http://localhost:3000/api/health
-
-# MCPO Health
-curl http://your-unraid-ip:6970/health
-
-# MCP Server Health
-curl http://your-unraid-ip:6970/mcp-unraid/health
-
-# End-to-End Test
-curl http://localhost:3000/api/test/connectivity
-```
-
-### 🛠️ **Troubleshooting Data Flow**
-
 #### **Common Issues & Solutions**
 
 1. **Web UI can't reach MCPO**:
@@ -240,33 +198,6 @@ curl http://localhost:3000/api/test/connectivity
    curl http://your-unraid-ip:6970/mcp-unraid/tools/test-unraid-connection
    ```
 
-### 📈 **Performance Monitoring**
-
-#### **Request Metrics**
-Monitor performance across the data flow:
-
-```bash
-# Web UI → MCPO latency
-curl http://localhost:3000/api/metrics/mcpo
-
-# MCPO → MCP Server latency  
-curl http://your-unraid-ip:6970/api/metrics/mcp
-
-# End-to-end response times
-curl http://localhost:3000/api/metrics/e2e
-```
-
-#### **Data Volume Tracking**
-```bash
-# Log data volume
-curl http://your-unraid-ip:6970/api/metrics/logs/volume
-
-# Analysis token usage
-curl http://localhost:3000/api/metrics/ai/tokens
-
-# Cache hit rates
-curl http://your-unraid-ip:6970/api/metrics/cache
-```
 
 ### 🔐 **Security & Data Privacy**
 
@@ -276,17 +207,10 @@ curl http://your-unraid-ip:6970/api/metrics/cache
 - **MCP Server ↔ Unraid**: Direct system access with containerized isolation
 
 #### **Data Retention**
-- **Logs**: Cached temporarily for analysis, not permanently stored
-- **Analysis Results**: Stored locally, configurable retention period
-- **Metrics**: Aggregated for performance monitoring, no sensitive data
+- **Logs**: Fetched on-demand, not permanently stored in unloggarr
+- **Analysis Results**: Stored locally in browser session/local storage
+- **Metrics**: Basic performance monitoring, no sensitive data retention
 
-#### **Privacy Controls**
-```env
-# Control data retention
-LOG_CACHE_TTL=3600          # Cache logs for 1 hour
-ANALYSIS_RETENTION_DAYS=30   # Keep analysis for 30 days  
-METRICS_ANONYMIZE=true       # Anonymize performance metrics
-```
 
 ## 🐳 Docker Deployment
 
@@ -310,20 +234,18 @@ For production deployment, use the included Docker setup that provides a complet
    # AI Analysis (REQUIRED for analysis features)
    ANTHROPIC_API_KEY=your_anthropic_api_key
    
-   # MCPO Configuration (REQUIRED)
-   MCPO_URL=http://your-unraid-ip:6970
-   MCPO_AUTH_TOKEN=your_mcpo_auth_token
+   # Unraid Configuration (REQUIRED)
+   UNRAID_API_URL=https://your-unraid-ip/graphql
+   UNRAID_API_KEY=your_unraid_api_key
+   UNRAID_VERIFY_SSL=false
    
-   # Application Settings
-   DEFAULT_LOG_LINES=5000
-   THEME_PERSISTENCE=true
+   # MCPO Configuration (REQUIRED)
+   MCPO_BASE_URL=http://unloggarr-mcpo:8000/unraid-mcp
    
    # Optional Integrations
    GOTIFY_URL=https://gotify.example.com
    GOTIFY_TOKEN=your_gotify_token
-   
-   # Security
-   UNRAID_VERIFY_SSL=false
+   unloggarr_SCHEDULE=0 * * * *
    ```
 
 3. **Deploy with Docker Compose:**
@@ -346,10 +268,12 @@ docker build -t unloggarr .
 docker run -d \
   --name unloggarr \
   -p 3000:3000 \
-  -e MCPO_URL=http://your-unraid-ip:6970 \
-  -e MCPO_AUTH_TOKEN=your_mcpo_token \
   -e ANTHROPIC_API_KEY=your_anthropic_key \
-  -e DEFAULT_LOG_LINES=5000 \
+  -e UNRAID_API_URL=https://your-unraid-ip/graphql \
+  -e UNRAID_API_KEY=your_unraid_api_key \
+  -e MCPO_BASE_URL=http://unloggarr-mcpo:8000/unraid-mcp \
+  -e GOTIFY_URL=https://gotify.example.com \
+  -e GOTIFY_TOKEN=your_gotify_token \
   -v ./logs:/app/logs \
   unloggarr
 ```
@@ -371,16 +295,16 @@ docker run -d \
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ANTHROPIC_API_KEY` | Anthropic API key for AI analysis (required) | - |
-| `MCPO_URL` | MCPO server endpoint URL (required) | `http://localhost:6970` |
-| `MCPO_AUTH_TOKEN` | MCPO authentication token (required) | - |
-| `DEFAULT_LOG_LINES` | Default number of log lines to fetch | `5000` |
-| `THEME_PERSISTENCE` | Save theme preference across sessions | `true` |
-| `GOTIFY_URL` | Gotify server URL for notifications | - |
-| `GOTIFY_TOKEN` | Gotify application token | - |
-| `ANALYSIS_SCHEDULE` | Cron schedule for automated analysis | `0 */6 * * *` |
-| `SUMMARY_SCHEDULE` | Cron schedule for daily summaries | `0 8 * * *` |
-| `ALERT_THRESHOLD` | Minimum log level for immediate alerts | `ERROR` |
+| `MCPO_BASE_URL` | MCPO server base URL (required) | `http://unloggarr-mcpo:8000/unraid-mcp` |
+| `UNRAID_API_URL` | Unraid server GraphQL endpoint | `https://192.168.1.100/graphql` |
+| `UNRAID_API_KEY` | Unraid API key for system access | - |
 | `UNRAID_VERIFY_SSL` | SSL certificate verification | `false` |
+| `GOTIFY_URL` | Gotify server URL for notifications (optional) | - |
+| `GOTIFY_TOKEN` | Gotify application token (optional) | - |
+| `unloggarr_SCHEDULE` | Cron schedule for automated analysis | `0 * * * *` |
+| `UNRAID_MCP_PORT` | MCP server port | `6970` |
+| `UNRAID_MCP_HOST` | MCP server host binding | `0.0.0.0` |
+| `UNRAID_MCP_LOG_LEVEL` | MCP server logging level | `INFO` |
 
 ## 🤖 AI Log Analysis
 
@@ -427,9 +351,7 @@ GOTIFY_URL=https://gotify.example.com
 GOTIFY_TOKEN=your_gotify_application_token
 
 # Scheduling Configuration
-ANALYSIS_SCHEDULE=0 */6 * * *  # Every 6 hours
-SUMMARY_SCHEDULE=0 8 * * *     # Daily at 8 AM
-ALERT_THRESHOLD=ERROR          # Immediate alerts for ERROR+ levels
+unloggarr_SCHEDULE=0 * * * *   # Every hour (cron format)
 ```
 
 ### 📊 **Notification Types**
