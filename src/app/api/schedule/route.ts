@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // Store the schedule information
 const scheduleInfo = {
   enabled: false,
-  schedule: process.env.unloggarr_SCHEDULE || '0 * * * *',
+  schedule: process.env.UNLOGGARR_SCHEDULE || '0 * * * *',
   lastRun: null as Date | null,
   nextRun: null as Date | null,
   status: 'stopped' as 'running' | 'stopped' | 'error'
@@ -146,7 +146,7 @@ export async function GET() {
       cronExpression: scheduleInfo.schedule,
       isRunning: scheduleInfo.enabled,
       environment: {
-        schedule: process.env.unloggarr_SCHEDULE,
+        schedule: process.env.UNLOGGARR_SCHEDULE,
         gotifyConfigured: !!(process.env.GOTIFY_URL && process.env.GOTIFY_TOKEN),
         anthropicConfigured: !!process.env.ANTHROPIC_API_KEY
       }
@@ -208,7 +208,9 @@ export async function POST(request: NextRequest) {
 }
 
 // Auto-start scheduler if enabled in environment
-if (process.env.unloggarr_SCHEDULE && process.env.NODE_ENV === 'development') {
+if (process.env.UNLOGGARR_SCHEDULE) {
   console.log('🚀 Auto-starting scheduler from environment configuration...');
+  console.log('📅 Schedule:', process.env.UNLOGGARR_SCHEDULE);
+  console.log('🔧 Environment:', process.env.NODE_ENV);
   startScheduler();
 } 

@@ -255,7 +255,7 @@ For production deployment, use the included Docker setup that provides a complet
    # Optional Integrations
    GOTIFY_URL=https://gotify.example.com
    GOTIFY_TOKEN=your_gotify_token
-   unloggarr_SCHEDULE=0 * * * *
+   UNLOGGARR_SCHEDULE=0 * * * *
    ```
 
 3. **Deploy with Docker Compose:**
@@ -311,7 +311,7 @@ docker run -d \
 | `UNRAID_VERIFY_SSL` | SSL certificate verification | `false` |
 | `GOTIFY_URL` | Gotify server URL for notifications (optional) | - |
 | `GOTIFY_TOKEN` | Gotify application token (optional) | - |
-| `unloggarr_SCHEDULE` | Cron schedule for automated analysis | `0 * * * *` |
+| `UNLOGGARR_SCHEDULE` | Cron schedule for automated analysis | `0 * * * *` |
 | `UNRAID_MCP_PORT` | MCP server port | `6970` |
 | `UNRAID_MCP_HOST` | MCP server host binding | `0.0.0.0` |
 | `UNRAID_MCP_LOG_LEVEL` | MCP server logging level | `INFO` |

@@ -61,6 +61,18 @@ if ! kill -0 $WEB_PID 2>/dev/null; then
 fi
 
 echo "✅ Web server started (PID: $WEB_PID)"
+
+# Auto-start scheduler if configured
+if [ ! -z "$unloggarr_SCHEDULE" ]; then
+    echo "⏰ Starting scheduler with cron: $unloggarr_SCHEDULE"
+    sleep 2  # Give web server time to fully start
+    curl -s -X POST -H "Content-Type: application/json" \
+         -d '{"action": "start"}' \
+         http://localhost:3000/api/schedule > /dev/null 2>&1 || \
+         echo "⚠️  Warning: Could not auto-start scheduler (will be available manually)"
+    echo "✅ Scheduler auto-start completed"
+fi
+
 echo "🎉 unloggarr is ready!"
 echo "📊 Web UI: http://localhost:3000"
 echo "🔧 MCP Server: http://localhost:6970/mcp"

@@ -48,5 +48,5 @@ networks:
 # ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
 # GOTIFY_URL=https://gotify.example.com
 # GOTIFY_TOKEN=your_gotify_token
-# unloggarr_SCHEDULE=0 * * * *
+# UNLOGGARR_SCHEDULE=0 * * * *
 # UNRAID_VERIFY_SSL=false 
