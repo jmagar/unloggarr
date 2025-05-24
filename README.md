@@ -351,7 +351,7 @@ GOTIFY_URL=https://gotify.example.com
 GOTIFY_TOKEN=your_gotify_application_token
 
 # Scheduling Configuration
-unloggarr_SCHEDULE=0 * * * *   # Every hour (cron format)
+UNLOGGARR_SCHEDULE=0 * * * *   # Every hour (cron format)
 ```
 
 ### 📊 **Notification Types**
