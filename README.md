@@ -68,6 +68,7 @@ AI-Powered Log Analyzer for Unraid servers with beautiful modern UI, built with 
 
 4. **Configure MCPO connection:**
    Ensure your MCPO server is running and accessible at the configured URL (default: http://localhost:6970)
+   The MCP server endpoint will be available at: `http://localhost:6970/mcp-unraid`
 
 5. **Open your browser:**
    Navigate to `http://localhost:3000`
@@ -94,6 +95,198 @@ unloggarr connects to MCPO (MCP Orchestrator) to access your Unraid system logs 
 - **System Monitoring** - Access to system status and health information
 - **Notification Integration** - Real-time Unraid notifications
 - **Multi-source Logs** - Access to syslog, docker logs, plugin logs, and more
+
+## 🔄 Data Flow Architecture
+
+Understanding how data flows through unloggarr's components helps with troubleshooting and system optimization:
+
+### 🏗️ **Component Architecture**
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Web UI        │◄──►│      MCPO       │◄──►│   MCP Server    │◄──►│   Unraid        │
+│   (unloggarr)   │    │  (Orchestrator) │    │ (/mcp-unraid)   │    │    System       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### 📊 **Data Flow Steps**
+
+#### 1. **Web UI → MCPO**
+- **Protocol**: HTTP/HTTPS REST API calls
+- **Endpoint**: `http://your-unraid-ip:6970`
+- **Authentication**: Bearer token via `MCPO_AUTH_TOKEN`
+- **Data**: User requests for logs, analysis, notifications, system status
+
+#### 2. **MCPO → MCP Server**
+- **Protocol**: Model Context Protocol (MCP) over HTTP
+- **Endpoint**: `http://localhost:6970/mcp-unraid` (default)
+- **Authentication**: MCP session management
+- **Data**: Translated tool calls and resource requests
+
+#### 3. **MCP Server → Unraid**
+- **Protocol**: Unraid API calls, file system access, system commands
+- **Authentication**: Direct system access (containerized security)
+- **Data**: Log files, system stats, notifications, configuration
+
+#### 4. **Response Flow** (Reverse path)
+- **Unraid** → **MCP Server**: Raw system data
+- **MCP Server** → **MCPO**: Structured MCP responses
+- **MCPO** → **Web UI**: JSON formatted data for frontend consumption
+
+### 🔧 **MCPO REST API Endpoints**
+
+MCPO exposes REST endpoints that translate to MCP tool calls:
+
+#### **Log Management**
+```bash
+GET    /api/logs                    # List available log files
+GET    /api/logs/{file}?lines=5000  # Fetch log entries
+POST   /api/logs/analyze            # Trigger AI analysis
+```
+
+#### **System Monitoring**
+```bash
+GET    /api/system/status           # System health status
+GET    /api/system/notifications    # Unraid notifications
+GET    /api/system/metrics          # Performance metrics
+```
+
+#### **Scheduler & Automation**
+```bash
+GET    /api/scheduler/status        # Scheduler status
+POST   /api/scheduler/control       # Start/stop scheduler
+GET    /api/scheduler/history       # Analysis history
+```
+
+### 📚 **API Documentation**
+
+#### **Swagger Documentation**
+Access comprehensive API documentation at:
+```
+http://your-unraid-ip:6970/docs
+```
+
+The Swagger interface provides:
+- **Interactive Testing** - Test API endpoints directly from the browser
+- **Request/Response Examples** - See expected data formats
+- **Authentication Testing** - Validate your MCPO auth tokens
+- **Schema Documentation** - Complete data models and types
+
+#### **MCP Server Documentation**
+View MCP-specific tool documentation at:
+```
+http://your-unraid-ip:6970/mcp-unraid/tools
+```
+
+### 🔍 **Data Tracing & Debugging**
+
+#### **Request Tracing**
+Monitor data flow with these endpoints:
+
+1. **Web UI Debug Console**:
+   ```javascript
+   // Browser console - view API calls
+   localStorage.setItem('debug', 'unloggarr:*')
+   ```
+
+2. **MCPO Request Logs**:
+   ```bash
+   # View MCPO request logs
+   curl http://your-unraid-ip:6970/api/debug/requests
+   ```
+
+3. **MCP Server Logs**:
+   ```bash
+   # View MCP server activity
+   curl http://your-unraid-ip:6970/mcp-unraid/logs
+   ```
+
+#### **Health Check Endpoints**
+Verify each component's health:
+
+```bash
+# Web UI Health
+curl http://localhost:3000/api/health
+
+# MCPO Health
+curl http://your-unraid-ip:6970/health
+
+# MCP Server Health
+curl http://your-unraid-ip:6970/mcp-unraid/health
+
+# End-to-End Test
+curl http://localhost:3000/api/test/connectivity
+```
+
+### 🛠️ **Troubleshooting Data Flow**
+
+#### **Common Issues & Solutions**
+
+1. **Web UI can't reach MCPO**:
+   ```bash
+   # Check MCPO connectivity
+   curl -H "Authorization: Bearer YOUR_TOKEN" http://your-unraid-ip:6970/api/status
+   ```
+
+2. **MCPO can't reach MCP Server**:
+   ```bash
+   # Check MCP server endpoint
+   curl http://your-unraid-ip:6970/mcp-unraid/health
+   ```
+
+3. **MCP Server can't access Unraid**:
+   ```bash
+   # Check Unraid API access
+   curl http://your-unraid-ip:6970/mcp-unraid/tools/test-unraid-connection
+   ```
+
+### 📈 **Performance Monitoring**
+
+#### **Request Metrics**
+Monitor performance across the data flow:
+
+```bash
+# Web UI → MCPO latency
+curl http://localhost:3000/api/metrics/mcpo
+
+# MCPO → MCP Server latency  
+curl http://your-unraid-ip:6970/api/metrics/mcp
+
+# End-to-end response times
+curl http://localhost:3000/api/metrics/e2e
+```
+
+#### **Data Volume Tracking**
+```bash
+# Log data volume
+curl http://your-unraid-ip:6970/api/metrics/logs/volume
+
+# Analysis token usage
+curl http://localhost:3000/api/metrics/ai/tokens
+
+# Cache hit rates
+curl http://your-unraid-ip:6970/api/metrics/cache
+```
+
+### 🔐 **Security & Data Privacy**
+
+#### **Data Flow Security**
+- **Web UI ↔ MCPO**: TLS encryption, bearer token authentication
+- **MCPO ↔ MCP Server**: Internal network communication, session tokens
+- **MCP Server ↔ Unraid**: Direct system access with containerized isolation
+
+#### **Data Retention**
+- **Logs**: Cached temporarily for analysis, not permanently stored
+- **Analysis Results**: Stored locally, configurable retention period
+- **Metrics**: Aggregated for performance monitoring, no sensitive data
+
+#### **Privacy Controls**
+```env
+# Control data retention
+LOG_CACHE_TTL=3600          # Cache logs for 1 hour
+ANALYSIS_RETENTION_DAYS=30   # Keep analysis for 30 days  
+METRICS_ANONYMIZE=true       # Anonymize performance metrics
+```
 
 ## 🐳 Docker Deployment
 
@@ -265,29 +458,30 @@ ALERT_THRESHOLD=ERROR          # Immediate alerts for ERROR+ levels
 1. **Auto-Connect** - The app automatically connects to your MCPO server on startup
 2. **Visual Status** - Check the MCPO connection indicator in the header for real-time status
 3. **Smart Defaults** - Starts with 5000 lines from your primary log file for comprehensive coverage
+4. **Data Flow Monitoring** - Use the API documentation at `http://your-unraid-ip:6970/docs` to monitor data flow
 
 ### 📊 **Enhanced Log Navigation**
-4. **Interactive Statistics** - Click the beautiful stat cards to filter by log level (Error, Warning, Info, Debug)
-5. **Advanced Search** - Use the search box with real-time highlighting of matching terms
-6. **Smart Filtering** - Combine level filters and search for precise log discovery
-7. **Log File Selection** - Switch between different log sources using the dropdown
+5. **Interactive Statistics** - Click the beautiful stat cards to filter by log level (Error, Warning, Info, Debug)
+6. **Advanced Search** - Use the search box with real-time highlighting of matching terms
+7. **Smart Filtering** - Combine level filters and search for precise log discovery
+8. **Log File Selection** - Switch between different log sources using the dropdown
 
 ### 🤖 **AI-Powered Insights**
-8. **Intelligent Analysis** - Click "Analyze with AI" for comprehensive system health insights
-9. **Streaming Results** - Watch AI analysis stream in real-time with progress indicators
-10. **Contextual Analysis** - AI considers your current filters and search terms
+9. **Intelligent Analysis** - Click "Analyze with AI" for comprehensive system health insights
+10. **Streaming Results** - Watch AI analysis stream in real-time with progress indicators
+11. **Contextual Analysis** - AI considers your current filters and search terms
 
 ### 📅 **Automated Features**
-11. **Scheduler Control** - Use the scheduler indicator to view and control automated analysis
-12. **Notification Management** - Configure Gotify integration for automated alerts and summaries
-13. **Analysis History** - Review past automated analysis results and trends
-14. **Alert Configuration** - Set thresholds and schedules for different types of notifications
+12. **Scheduler Control** - Use the scheduler indicator to view and control automated analysis
+13. **Notification Management** - Configure Gotify integration for automated alerts and summaries
+14. **Analysis History** - Review past automated analysis results and trends
+15. **Alert Configuration** - Set thresholds and schedules for different types of notifications
 
 ### 🎨 **Beautiful Interface**
-11. **Interactive Elements** - Hover over cards and entries for delightful micro-animations
-12. **Enhanced Details** - Click any log entry to expand and see formatted details
-13. **Scroll Navigation** - Use the floating scroll-to-top button for easy navigation
-14. **Loading States** - Enjoy elegant skeleton loading animations during data fetching
+16. **Interactive Elements** - Hover over cards and entries for delightful micro-animations
+17. **Enhanced Details** - Click any log entry to expand and see formatted details
+18. **Scroll Navigation** - Use the floating scroll-to-top button for easy navigation
+19. **Loading States** - Enjoy elegant skeleton loading animations during data fetching
 
 ## 🌙 **Enhanced Theme Support**
 
