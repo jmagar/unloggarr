@@ -1,0 +1,52 @@
+services:
+  unloggarr:
+    build: .
+    container_name: unloggarr
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # Web UI
+      - "6970:6970"   # MCP Server SSE
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=production
+      - UNRAID_MCP_TRANSPORT=sse
+      - UNRAID_MCP_HOST=0.0.0.0
+      - UNRAID_MCP_PORT=6970
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # depends_on:
+    #   - unloggarr-mcpo
+    networks:
+      - unloggarr-network
+
+  unloggarr-mcpo:
+    image: ghcr.io/open-webui/mcpo:main
+    container_name: unloggarr-mcpo
+    restart: unless-stopped
+    ports:
+      - "8000:8000"   # MCPO OpenAPI Proxy
+    env_file:
+      - .env.local
+    volumes:
+      - /home/jmagar/code/unloggar/mcpo-config.json:/app/config.json
+    command: --config /app/config.json
+    networks:
+      - unloggarr-network
+
+networks:
+  unloggarr-network:
+    driver: bridge
+
+# Example .env file content:
+# UNRAID_API_URL=https://192.168.1.100/graphql
+# UNRAID_API_KEY=your_unraid_api_key_here
+# ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
+# GOTIFY_URL=https://gotify.example.com
+# GOTIFY_TOKEN=your_gotify_token
+# unloggarr_SCHEDULE=0 * * * *
+# UNRAID_VERIFY_SSL=false 

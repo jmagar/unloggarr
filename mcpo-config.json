@@ -1,0 +1,8 @@
+{
+    "mcpServers": {
+        "mcp-unraid": {
+            "url": "http://unloggarr:6970/mcp",
+            "type": "sse"
+        }
+    }
+}

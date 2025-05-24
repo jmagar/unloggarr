@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+unraid-mcp/.venv/
+unraid-mcp/__pycache__/
+
+# Build outputs
+.next/
+dist/
+build/
+
+# Development files
+.git/
+.gitignore
+*.log
+*.md
+README.md
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files (will be passed via docker-compose)
+.env
+.env.local
+.env.development
+.env.production
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+
+# Cache directories
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation
+cline_docs/
+
+# Docker files (don't need in container)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Logs directory (mounted as volume)
+logs/ 
