@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { getThemeClasses } from '../../../utils/theme';
 import { useLogs } from '../../../hooks/useLogs';
@@ -8,13 +8,14 @@ import { useTheme } from '../../../hooks/useTheme';
 import { useNotifications } from '../../../hooks/useNotifications';
 import { useScheduler } from '../../../hooks/useScheduler';
 import { useLogAnalysis } from '../../../hooks/useLogAnalysis';
+import { useSettings } from '../../../hooks/useSettings';
 import { Header } from '../Header';
 import { LogControls } from '../LogControls';
 import { LogStats } from './LogStats';
 import { LogEntry } from './LogEntry';
 import { ScrollToTop } from './ScrollToTop';
 import { SkeletonLoader, EmptyState } from '../common';
-import { AnalysisModal } from '../Modals';
+import { AnalysisModal, SchedulerModal, SettingsModal, LogDetailModal } from '../Modals';
 
 /**
  * Main LogViewer component - decomposed and modular
@@ -30,17 +31,25 @@ import { AnalysisModal } from '../Modals';
  * - Maintains the same functionality while improving maintainability
  */
 const LogViewer: React.FC = () => {
+  // Client-side rendering check to prevent hydration issues
+  const [isClient, setIsClient] = useState(false);
+  
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   // State management through custom hooks
   const { theme, showSettings, setShowSettings, toggleTheme } = useTheme();
-  const { 
-    logs, 
-    availableLogFiles, 
-    selectedLogFile, 
-    isLoading, 
-    isConnected, 
-    tailLines, 
-    searchTerm, 
-    selectedLevel, 
+  const {
+    logs,
+    availableLogFiles,
+    selectedLogFile,
+    selectedLog,
+    isLoading,
+    isConnected,
+    tailLines,
+    searchTerm,
+    selectedLevel,
     filteredLogs,
     setSelectedLogFile,
     setSelectedLog,
@@ -50,16 +59,18 @@ const LogViewer: React.FC = () => {
     fetchLogs
   } = useLogs();
   
-  const { 
-    notificationCount, 
-    showNotifications, 
-    setShowNotifications 
+  const {
+    notifications,
+    notificationCount,
+    showNotifications,
+    setShowNotifications
   } = useNotifications();
   
-  const { 
-    schedulerStatus, 
-    showScheduler, 
-    setShowScheduler 
+  const {
+    schedulerStatus,
+    showScheduler,
+    setShowScheduler,
+    controlScheduler
   } = useScheduler();
   
   const { 
@@ -71,8 +82,29 @@ const LogViewer: React.FC = () => {
     analyzeLogsWithAI 
   } = useLogAnalysis();
 
+  const {
+    settings,
+    startAutoRefresh,
+    stopAutoRefresh
+  } = useSettings();
+
   // Get theme classes
   const themeClasses = getThemeClasses(theme);
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (settings.autoRefresh && !isLoading) {
+      const timer = startAutoRefresh(() => {
+        console.log('🔄 Auto-refreshing logs...');
+        fetchLogs();
+      });
+      return () => {
+        if (timer) clearInterval(timer);
+      };
+    } else {
+      stopAutoRefresh();
+    }
+  }, [settings.autoRefresh, settings.refreshInterval, isLoading, fetchLogs, startAutoRefresh, stopAutoRefresh]);
 
   // Event handlers
   const handleAnalyze = () => {
@@ -82,6 +114,11 @@ const LogViewer: React.FC = () => {
   const handleRefresh = () => {
     fetchLogs();
   };
+
+  // Apply max log entries setting with memoization for performance
+  const limitedFilteredLogs = useMemo(() => {
+    return filteredLogs.slice(0, settings.maxLogEntries);
+  }, [filteredLogs, settings.maxLogEntries]);
 
   return (
     <div className={`min-h-screen ${themeClasses.container} transition-colors duration-300 relative overflow-x-hidden`}>
@@ -96,9 +133,12 @@ const LogViewer: React.FC = () => {
           theme={theme}
           isConnected={isConnected}
           notificationCount={notificationCount}
+          notifications={notifications || []}
+          showNotifications={showNotifications}
           schedulerStatus={schedulerStatus}
           onThemeToggle={toggleTheme}
           onNotificationsClick={() => setShowNotifications(!showNotifications)}
+          onNotificationsClose={() => setShowNotifications(false)}
           onSchedulerClick={() => setShowScheduler(!showScheduler)}
           onSettingsClick={() => setShowSettings(!showSettings)}
         />
@@ -141,22 +181,37 @@ const LogViewer: React.FC = () => {
               : 'from-gray-50 via-white to-gray-50 border-gray-200'
           }`}>
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
-                Log Entries ({filteredLogs.length.toLocaleString()})
-              </h2>
-              {isConnected && (
-                <div className={`text-sm ${themeClasses.text.secondary} flex items-center gap-2`}>
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  <span>from {selectedLogFile}</span>
-                </div>
-              )}
+              <div>
+                <h2 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
+                  Log Entries ({limitedFilteredLogs.length.toLocaleString()})
+                </h2>
+                {filteredLogs.length > settings.maxLogEntries && (
+                  <p className={`text-xs ${themeClasses.text.secondary} mt-1`}>
+                    Showing {settings.maxLogEntries.toLocaleString()} of {filteredLogs.length.toLocaleString()} entries
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                {settings.autoRefresh && (
+                  <div className={`text-xs ${themeClasses.text.secondary} flex items-center gap-2`}>
+                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                    <span>Auto-refresh: {settings.refreshInterval}s</span>
+                  </div>
+                )}
+                {isConnected && (
+                  <div className={`text-sm ${themeClasses.text.secondary} flex items-center gap-2`}>
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span>from {selectedLogFile}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
           <div className="max-h-[70vh] overflow-y-auto">
             {isLoading ? (
               <SkeletonLoader theme={theme} variant="logEntry" count={8} />
-            ) : filteredLogs.length === 0 ? (
+            ) : limitedFilteredLogs.length === 0 ? (
               <EmptyState
                 theme={theme}
                 variant={logs.length === 0 ? 'noLogs' : 'noResults'}
@@ -167,37 +222,68 @@ const LogViewer: React.FC = () => {
                 }}
               />
             ) : (
-              <div className={`divide-y ${theme === 'dark' ? 'divide-gray-700/50' : 'divide-gray-100'}`}>
-                {filteredLogs.map((log, index) => (
-                  <LogEntry
-                    key={log.id}
-                    log={log}
-                    index={index}
-                    theme={theme}
-                    searchTerm={searchTerm}
-                    onClick={() => setSelectedLog(log)}
-                  />
+              <div className={`${settings.compactView ? 'divide-y-0' : 'divide-y'} ${theme === 'dark' ? 'divide-gray-700/50' : 'divide-gray-100'}`}>
+                {(limitedFilteredLogs || []).map((log, index) => (
+                  <div
+                    key={log.id || `log-${index}`}
+                    className={settings.compactView ? 'py-1' : ''}
+                  >
+                    <LogEntry
+                      log={log}
+                      index={index}
+                      theme={theme}
+                      searchTerm={searchTerm}
+                      onClick={() => setSelectedLog(log)}
+                      compact={settings.compactView}
+                      showTimestamps={settings.showTimestamps}
+                      highlightErrors={settings.highlightErrors}
+                    />
+                  </div>
                 ))}
               </div>
             )}
           </div>
         </div>
 
-        {/* Modal Components */}
-        <AnalysisModal
-          theme={theme}
-          isOpen={showAnalysis}
-          onClose={() => setShowAnalysis(false)}
-          isAnalyzing={isAnalyzing}
-          analysisResult={analysisResult}
-          tokenUsage={tokenUsage}
-        />
+        {/* Modal Components - Only render on client side to prevent hydration issues */}
+        {isClient && (
+          <>
+            <AnalysisModal
+              theme={theme}
+              isOpen={showAnalysis}
+              onClose={() => setShowAnalysis(false)}
+              isAnalyzing={isAnalyzing}
+              analysisResult={analysisResult}
+              tokenUsage={tokenUsage}
+            />
 
-        {/* TODO: Add remaining modal components */}
-        {/* - LogDetailModal */}
-        {/* - SchedulerModal */}
-        {/* - SettingsModal */}
-        {/* - NotificationsPopover */}
+            <SchedulerModal
+              theme={theme}
+              isOpen={showScheduler}
+              onClose={() => setShowScheduler(false)}
+              schedulerStatus={schedulerStatus}
+              onControlScheduler={controlScheduler}
+            />
+
+            <SettingsModal
+              theme={theme}
+              isOpen={showSettings}
+              onClose={() => setShowSettings(false)}
+              onThemeChange={toggleTheme}
+              onSettingsChange={(newSettings) => {
+                console.log('Settings updated:', newSettings);
+                // Settings are automatically saved by the useSettings hook
+              }}
+            />
+
+            <LogDetailModal
+              theme={theme}
+              isOpen={!!selectedLog}
+              onClose={() => setSelectedLog(null)}
+              log={selectedLog}
+            />
+          </>
+        )}
 
       </div>
       

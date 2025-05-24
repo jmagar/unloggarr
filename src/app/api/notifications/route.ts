@@ -11,8 +11,8 @@ export async function GET() {
       headers: MCPO_HEADERS
     });
 
-    // Get recent unread notifications 
-          const notificationsResponse = await fetch(getMcpoEndpoint('list_notifications'), {
+    // Get recent unread notifications
+    const notificationsResponse = await fetch(getMcpoEndpoint('list_notifications'), {
       method: 'POST',
       headers: MCPO_HEADERS,
       body: JSON.stringify({
@@ -29,6 +29,20 @@ export async function GET() {
 
     console.log('📊 Notifications overview:', JSON.stringify(overviewData, null, 2));
     console.log('📔 Recent notifications:', JSON.stringify(notificationsData, null, 2));
+
+    // Check if MCP server returned errors and provide fallback data
+    const hasOverviewError = !overviewResponse.ok || (overviewData && overviewData.detail && overviewData.detail.message === "Unexpected error");
+    const hasNotificationsError = !notificationsResponse.ok || (notificationsData && notificationsData.detail && notificationsData.detail.message === "Unexpected error");
+
+    if (hasOverviewError || hasNotificationsError) {
+      console.warn('⚠️ MCP server errors detected, providing fallback data');
+      return NextResponse.json({
+        success: true,
+        overview: hasOverviewError ? { unread: { total: 0 }, archive: { total: 0 } } : overviewData,
+        notifications: hasNotificationsError ? [] : notificationsData,
+        warning: 'MCP server error - using fallback data'
+      });
+    }
 
     return NextResponse.json({
       success: true,

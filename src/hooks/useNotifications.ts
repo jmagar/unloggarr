@@ -13,9 +13,20 @@ export const useNotifications = () => {
 
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
-    const result = await fetchNotificationsService();
-    setNotifications(result.notifications);
-    setNotificationCount(result.count);
+    try {
+      const result = await fetchNotificationsService();
+      // Add safety checks to ensure arrays are properly handled
+      const safeNotifications = Array.isArray(result.notifications) ? result.notifications : [];
+      const safeCount = typeof result.count === 'number' ? result.count : 0;
+      
+      setNotifications(safeNotifications);
+      setNotificationCount(safeCount);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      // Set safe fallback values
+      setNotifications([]);
+      setNotificationCount(0);
+    }
   }, []);
 
   // Load notifications on mount

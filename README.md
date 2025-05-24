@@ -8,7 +8,7 @@ AI-Powered Log Analyzer for Unraid servers with beautiful modern UI, built with 
 
 *The beautiful modern interface with enhanced UI components, dark theme support, and AI-powered analysis capabilities.*
 
-![AI Analysis Modal](./assets/Screenshot%202025-05-24%20075934.png)
+![AI Analysis Modal](./assets/analysis.png)
 
 *AI-powered log analysis with streaming results, token usage statistics, and cost tracking using Anthropic Claude 3.5 Sonnet.*
 

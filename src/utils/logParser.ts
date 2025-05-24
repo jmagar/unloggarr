@@ -54,14 +54,20 @@ export const parseLogLine = (line: string, index: number): LogEntry => {
  * @returns Filtered log entries
  */
 export const filterLogs = (
-  logs: LogEntry[], 
-  searchTerm: string, 
+  logs: LogEntry[],
+  searchTerm: string,
   selectedLevel: string
 ): LogEntry[] => {
+  // Add safety check to prevent .filter() on undefined/null
+  if (!logs || !Array.isArray(logs)) {
+    console.warn('filterLogs: logs is not an array:', logs);
+    return [];
+  }
+  
   return logs.filter(log => {
     const matchesSearch = log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          log.source?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesLevel = selectedLevel === 'ALL' || log.level === selectedLevel;
     return matchesSearch && matchesLevel;
   });
-}; 
+};

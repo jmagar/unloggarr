@@ -9,7 +9,7 @@ import { SAMPLE_LOGS, DEFAULT_LOG_FILE, DEFAULT_TAIL_LINES, DEFAULT_SELECTED_LEV
  * @returns Log state and actions
  */
 export const useLogs = () => {
-  const [logs, setLogs] = useState<LogEntry[]>(SAMPLE_LOGS);
+  const [logs, setLogs] = useState<LogEntry[]>(SAMPLE_LOGS || []);
   const [availableLogFiles, setAvailableLogFiles] = useState<string[]>([DEFAULT_LOG_FILE]);
   const [selectedLogFile, setSelectedLogFile] = useState(DEFAULT_LOG_FILE);
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
@@ -22,10 +22,11 @@ export const useLogs = () => {
   // Fetch available log files
   const fetchAvailableLogFiles = useCallback(async () => {
     const files = await fetchAvailableLogFilesService();
-    if (files.length > 0) {
+    if (files && Array.isArray(files) && files.length > 0) {
       setAvailableLogFiles(files);
       setIsConnected(true);
     } else {
+      setAvailableLogFiles([DEFAULT_LOG_FILE]);
       setIsConnected(false);
     }
   }, []);
@@ -37,22 +38,24 @@ export const useLogs = () => {
     
     try {
       const fetchedLogs = await fetchLogsService(targetFile, tailLines);
-      if (fetchedLogs.length > 0) {
+      if (fetchedLogs && Array.isArray(fetchedLogs) && fetchedLogs.length > 0) {
         setLogs(fetchedLogs);
         setIsConnected(true);
       } else {
+        setLogs([]); // Ensure logs is always an array
         setIsConnected(false);
       }
     } catch (error) {
       console.error('Error fetching logs:', error);
+      setLogs([]); // Ensure logs is always an array even on error
       setIsConnected(false);
     } finally {
       setIsLoading(false);
     }
   }, [selectedLogFile, tailLines]);
 
-  // Get filtered logs
-  const filteredLogs = filterLogs(logs, searchTerm, selectedLevel);
+  // Get filtered logs with safety check
+  const filteredLogs = filterLogs(logs || [], searchTerm, selectedLevel);
 
   // Load available log files on mount
   useEffect(() => {

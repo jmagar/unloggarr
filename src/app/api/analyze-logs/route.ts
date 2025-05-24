@@ -105,8 +105,12 @@ Please provide a comprehensive analysis including:
 
 Format your response in clear markdown with emojis for better readability. Be specific about Unraid-related issues and provide practical solutions.`;
 
+    // Get model from environment variable with fallback
+    const modelName = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022';
+    console.log(`🤖 Using AI model: ${modelName}`);
+
     const result = streamText({
-      model: anthropic('claude-3-5-sonnet-20241022'),
+      model: anthropic(modelName),
       prompt: analysisPrompt,
       temperature: 0.3,
     });
@@ -122,35 +126,57 @@ Format your response in clear markdown with emojis for better readability. Be sp
           
           // Get the final result with usage information
           const finalResult = await result;
-          let usage;
-          
-          try {
-            // Usage might be a Promise in AI SDK v5
-            usage = await finalResult.usage;
-            console.log('🔢 Token usage (awaited):', usage);
-          } catch {
-            console.log('🔢 Usage not awaitable, using direct access');
-            usage = finalResult.usage;
-            console.log('🔢 Token usage (direct):', usage);
-          }
-          
+          console.log('🔢 Final result object:', finalResult);
           console.log('🔢 Final result keys:', Object.keys(finalResult));
+          
+          let usage = null;
+          
+          // Try multiple ways to get usage information from AI SDK v5
+          try {
+            // First try to get usage directly
+            if (finalResult.usage) {
+              usage = finalResult.usage;
+              console.log('🔢 Token usage (direct):', usage);
+            }
+            // Try experimental usage property with type assertion
+            else if ((finalResult as any).experimental_providerMetadata?.anthropic?.usage) {
+              const anthropicUsage = (finalResult as any).experimental_providerMetadata.anthropic.usage;
+              usage = {
+                promptTokens: anthropicUsage.input_tokens || 0,
+                completionTokens: anthropicUsage.output_tokens || 0,
+                totalTokens: (anthropicUsage.input_tokens || 0) + (anthropicUsage.output_tokens || 0)
+              };
+              console.log('🔢 Token usage (anthropic metadata):', usage);
+            }
+            // Try response metadata with type assertion
+            else if ((finalResult as any).response?.headers) {
+              console.log('🔢 Response headers:', (finalResult as any).response.headers);
+            }
+            
+            // If usage is a Promise, await it
+            if (usage && typeof usage.then === 'function') {
+              usage = await usage;
+              console.log('🔢 Token usage (awaited):', usage);
+            }
+          } catch (error) {
+            console.log('🔢 Error getting usage:', error);
+          }
           
           // Send token usage as a final chunk with a special marker
           if (usage && typeof usage === 'object') {
-            // Type assertion for usage object since AI SDK v5 types might be different
-            const usageObj = usage as { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+            // Type assertion for usage object to handle AI SDK v5 structure
+            const usageObj = usage as any;
             const tokenData = {
-              promptTokens: usageObj.promptTokens || 0,
-              completionTokens: usageObj.completionTokens || 0,
-              totalTokens: usageObj.totalTokens || (usageObj.promptTokens || 0) + (usageObj.completionTokens || 0)
+              promptTokens: usageObj.inputTokens || usageObj.promptTokens || 0,
+              completionTokens: usageObj.outputTokens || usageObj.completionTokens || 0,
+              totalTokens: usageObj.totalTokens || (usageObj.inputTokens || 0) + (usageObj.outputTokens || 0)
             };
             console.log('🔢 Formatted token data:', tokenData);
             
             const tokenInfo = `\n\n<!--TOKENS:${JSON.stringify(tokenData)}-->`;
             controller.enqueue(new TextEncoder().encode(tokenInfo));
           } else {
-            console.log('⚠️ No usage information available');
+            console.log('⚠️ No usage information available, sending zeros');
             // Send empty token info so frontend knows analysis is complete
             const tokenInfo = `\n\n<!--TOKENS:{"promptTokens":0,"completionTokens":0,"totalTokens":0}-->`;
             controller.enqueue(new TextEncoder().encode(tokenInfo));

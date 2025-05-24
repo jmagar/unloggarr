@@ -101,7 +101,18 @@ async function fetchUnraidLogs(logFile: string = '/var/log/syslog', tailLines: n
       })
     });
 
+    if (!response.ok) {
+      console.error(`❌ MCP server error: ${response.status} ${response.statusText}`);
+      throw new Error(`MCP server returned ${response.status}: ${response.statusText}`);
+    }
+
     const data = await response.json();
+    
+    // Check for error in response data
+    if (data.error) {
+      console.error(`❌ MCP server error in response: ${data.error}`);
+      throw new Error(`MCP server error: ${data.error}`);
+    }
     
     // Parse logs from Unraid response
     let logLines: string[] = [];
@@ -110,6 +121,8 @@ async function fetchUnraidLogs(logFile: string = '/var/log/syslog', tailLines: n
       logLines = data.content.split('\n').filter((line: string) => line.trim());
     } else if (data.logs && Array.isArray(data.logs)) {
       logLines = data.logs;
+    } else {
+      console.warn('⚠️ Unexpected response format from MCP server:', data);
     }
     
     console.log(`📊 Found ${logLines.length} log lines to parse`);
@@ -120,7 +133,7 @@ async function fetchUnraidLogs(logFile: string = '/var/log/syslog', tailLines: n
     return parsedLogs;
   } catch (error) {
     console.error('💥 Error fetching Unraid logs:', error);
-    return [];
+    throw error; // Re-throw instead of returning empty array
   }
 }
 

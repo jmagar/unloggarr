@@ -24,6 +24,19 @@ export async function POST(request: NextRequest) {
     console.log(`📊 Data type: ${typeof data}`);
     console.log(`📊 Data keys: ${Object.keys(data)}`);
     
+    // Check if MCP server returned an error
+    if (!response.ok || (data && data.detail && data.detail.message === "Unexpected error")) {
+      console.error('❌ MCP server returned error:', data);
+      // Return empty logs instead of failing completely
+      return NextResponse.json({
+        success: true,
+        logs: [],
+        total_lines: 0,
+        source_data: data,
+        warning: 'MCP server error - using fallback empty logs'
+      });
+    }
+    
     // Handle different response formats and convert to expected frontend format
     let logLines: string[] = [];
     
@@ -51,9 +64,9 @@ export async function POST(request: NextRequest) {
     console.log(`📊 Processed ${logLines.length} log lines`);
     
     // Return standardized format for frontend
-    return NextResponse.json({ 
-      success: true, 
-      logs: logLines, 
+    return NextResponse.json({
+      success: true,
+      logs: logLines,
       total_lines: logLines.length,
       source_data: data  // Keep original data for debugging
     });

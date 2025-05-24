@@ -58,11 +58,13 @@ export const analyzeLogsWithAI = async (
         const tokenMatch = result.match(/<!--TOKENS:(.+?)-->/);
         if (tokenMatch) {
           try {
+            console.log('🔢 Found token marker:', tokenMatch[1]);
             tokenUsage = JSON.parse(tokenMatch[1]);
+            console.log('🔢 Parsed token usage:', tokenUsage);
             // Remove the token marker from the display
             result = result.replace(/\n\n<!--TOKENS:.+?-->/, '');
           } catch (e) {
-            console.error('Failed to parse token usage:', e);
+            console.error('Failed to parse token usage:', e, 'Raw token data:', tokenMatch[1]);
           }
         }
         

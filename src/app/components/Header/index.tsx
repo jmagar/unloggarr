@@ -1,18 +1,22 @@
 import React from 'react';
 import { Zap, Server, Settings } from 'lucide-react';
-import { Theme, SchedulerStatus } from '../../../types';
+import { Theme, SchedulerStatus, NotificationItem } from '../../../types';
 import { getThemeClasses } from '../../../utils/theme';
 import { ThemeToggle } from './ThemeToggle';
 import { NotificationBell } from './NotificationBell';
 import { SchedulerIndicator } from './SchedulerIndicator';
+import { NotificationsPopover } from './NotificationsPopover';
 
 interface HeaderProps {
   theme: Theme;
   isConnected: boolean;
   notificationCount: number;
+  notifications: NotificationItem[];
+  showNotifications: boolean;
   schedulerStatus: SchedulerStatus | null;
   onThemeToggle: () => void;
   onNotificationsClick: () => void;
+  onNotificationsClose: () => void;
   onSchedulerClick: () => void;
   onSettingsClick: () => void;
 }
@@ -24,9 +28,12 @@ export const Header: React.FC<HeaderProps> = ({
   theme,
   isConnected,
   notificationCount,
+  notifications,
+  showNotifications,
   schedulerStatus,
   onThemeToggle,
   onNotificationsClick,
+  onNotificationsClose,
   onSchedulerClick,
   onSettingsClick
 }) => {
@@ -71,17 +78,27 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Header Actions */}
       <div className="flex items-center gap-2">
-        <SchedulerIndicator 
-          theme={theme} 
-          schedulerStatus={schedulerStatus} 
-          onClick={onSchedulerClick} 
+        <SchedulerIndicator
+          theme={theme}
+          schedulerStatus={schedulerStatus}
+          onClick={onSchedulerClick}
         />
 
-        <NotificationBell 
-          theme={theme} 
-          notificationCount={notificationCount} 
-          onClick={onNotificationsClick} 
-        />
+        <div className="relative">
+          <NotificationBell
+            theme={theme}
+            notificationCount={notificationCount}
+            onClick={onNotificationsClick}
+          />
+          
+          <NotificationsPopover
+            theme={theme}
+            isOpen={showNotifications}
+            onClose={onNotificationsClose}
+            notifications={notifications}
+            notificationCount={notificationCount}
+          />
+        </div>
         
         <ThemeToggle theme={theme} onToggle={onThemeToggle} />
 
