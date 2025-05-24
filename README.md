@@ -2,6 +2,16 @@
 
 AI-Powered Log Analyzer for Unraid servers with beautiful modern UI, built with Next.js 15, AI SDK 5 Alpha, and TypeScript.
 
+## 📸 Screenshots
+
+![unloggarr Interface](./assets/logviewer.png)
+
+*The beautiful modern interface with enhanced UI components, dark theme support, and AI-powered analysis capabilities.*
+
+![AI Analysis Modal](./assets/Screenshot%202025-05-24%20075934.png)
+
+*AI-powered log analysis with streaming results, token usage statistics, and cost tracking using Anthropic Claude 3.5 Sonnet.*
+
 ## ✨ Features
 
 ### 🎨 **Beautiful Modern Interface**

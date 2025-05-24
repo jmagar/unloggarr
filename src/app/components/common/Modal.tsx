@@ -5,11 +5,11 @@ import { getThemeClasses } from '../../../utils/theme';
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   subtitle?: string;
   children: React.ReactNode;
   theme: Theme;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'large';
   footer?: React.ReactNode;
 }
 
@@ -32,7 +32,8 @@ export const Modal: React.FC<ModalProps> = ({
     sm: 'max-w-md',
     md: 'max-w-lg', 
     lg: 'max-w-4xl',
-    xl: 'max-w-6xl'
+    xl: 'max-w-6xl',
+    large: 'max-w-4xl'
   };
 
   if (!isOpen) return null;
@@ -43,8 +44,12 @@ export const Modal: React.FC<ModalProps> = ({
         {/* Header */}
         <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">{title}</h3>
+            <div className="flex-1">
+              {typeof title === 'string' ? (
+                <h3 className="text-lg font-semibold">{title}</h3>
+              ) : (
+                title
+              )}
               {subtitle && (
                 <p className={`text-sm ${themeClasses.text.secondary} mt-1`}>
                   {subtitle}
@@ -53,7 +58,7 @@ export const Modal: React.FC<ModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className={`${themeClasses.text.secondary} hover:${themeClasses.text.primary} transition-colors`}
+              className={`${themeClasses.text.secondary} hover:${themeClasses.text.primary} transition-colors ml-4`}
             >
               ✕
             </button>

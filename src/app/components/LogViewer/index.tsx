@@ -14,6 +14,7 @@ import { LogStats } from './LogStats';
 import { LogEntry } from './LogEntry';
 import { ScrollToTop } from './ScrollToTop';
 import { SkeletonLoader, EmptyState } from '../common';
+import { AnalysisModal } from '../Modals';
 
 /**
  * Main LogViewer component - decomposed and modular
@@ -63,6 +64,10 @@ const LogViewer: React.FC = () => {
   
   const { 
     isAnalyzing, 
+    analysisResult,
+    showAnalysis,
+    tokenUsage,
+    setShowAnalysis,
     analyzeLogsWithAI 
   } = useLogAnalysis();
 
@@ -178,9 +183,18 @@ const LogViewer: React.FC = () => {
           </div>
         </div>
 
-        {/* TODO: Add modal components here */}
+        {/* Modal Components */}
+        <AnalysisModal
+          theme={theme}
+          isOpen={showAnalysis}
+          onClose={() => setShowAnalysis(false)}
+          isAnalyzing={isAnalyzing}
+          analysisResult={analysisResult}
+          tokenUsage={tokenUsage}
+        />
+
+        {/* TODO: Add remaining modal components */}
         {/* - LogDetailModal */}
-        {/* - AnalysisModal */}
         {/* - SchedulerModal */}
         {/* - SettingsModal */}
         {/* - NotificationsPopover */}
