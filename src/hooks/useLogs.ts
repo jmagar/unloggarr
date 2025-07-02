@@ -19,25 +19,32 @@ export const useLogs = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevel, setSelectedLevel] = useState(DEFAULT_SELECTED_LEVEL);
 
-  // Fetch available log files
+  // Fetch available log files with better error handling
   const fetchAvailableLogFiles = useCallback(async () => {
-    const files = await fetchAvailableLogFilesService();
-    if (files && Array.isArray(files) && files.length > 0) {
-      setAvailableLogFiles(files);
-      setIsConnected(true);
-    } else {
+    try {
+      const files = await fetchAvailableLogFilesService();
+      if (files && Array.isArray(files) && files.length > 0) {
+        setAvailableLogFiles(files);
+        setIsConnected(true);
+      } else {
+        setAvailableLogFiles([DEFAULT_LOG_FILE]);
+        setIsConnected(false);
+      }
+    } catch (error) {
+      console.error('Error fetching available log files:', error);
       setAvailableLogFiles([DEFAULT_LOG_FILE]);
       setIsConnected(false);
     }
   }, []);
 
-  // Fetch logs
-  const fetchLogs = useCallback(async (logFile?: string) => {
+  // Fetch logs with optimized dependencies
+  const fetchLogs = useCallback(async (logFile?: string, lines?: number) => {
     setIsLoading(true);
     const targetFile = logFile || selectedLogFile;
+    const targetLines = lines || tailLines;
     
     try {
-      const fetchedLogs = await fetchLogsService(targetFile, tailLines);
+      const fetchedLogs = await fetchLogsService(targetFile, targetLines);
       if (fetchedLogs && Array.isArray(fetchedLogs) && fetchedLogs.length > 0) {
         setLogs(fetchedLogs);
         setIsConnected(true);
@@ -52,20 +59,20 @@ export const useLogs = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedLogFile, tailLines]);
+  }, []); // Remove dependencies to prevent unnecessary re-creation
 
   // Get filtered logs with safety check
   const filteredLogs = filterLogs(logs || [], searchTerm, selectedLevel);
 
-  // Load available log files on mount
+  // Load available log files on mount only
   useEffect(() => {
     fetchAvailableLogFiles();
-  }, [fetchAvailableLogFiles]);
+  }, []); // Empty dependency array - run only on mount
 
   // Fetch logs when log file or tail lines change
   useEffect(() => {
-    fetchLogs(selectedLogFile);
-  }, [fetchLogs, selectedLogFile]);
+    fetchLogs(selectedLogFile, tailLines);
+  }, [selectedLogFile, tailLines]); // Only depend on the actual values, not the function
 
   return {
     // State

@@ -1,4 +1,5 @@
 import { AnalysisRequest, TokenUsage } from '../types';
+import { timeAsync } from '../utils/performance';
 
 /**
  * Result from streaming analysis
@@ -24,35 +25,61 @@ export const analyzeLogsWithAI = async (
   request: AnalysisRequest,
   onUpdate: AnalysisCallback
 ): Promise<void> => {
-  try {
-    console.log(`🤖 Starting AI analysis of ${request.logs.length} logs...`);
-    
-    const response = await fetch('/api/analyze-logs', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
+  await timeAsync(
+    'log-analysis',
+    async () => {
+      console.log(`🤖 Starting AI analysis of ${request.logs.length} logs...`);
+      
+      const response = await fetch('/api/analyze-logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
 
     if (!response.ok) {
       throw new Error(`Analysis failed: ${response.status}`);
     }
 
-    // Handle streaming response
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
+      // Handle streaming response with timeout and iteration limits
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
 
-    if (reader) {
-      let result = '';
-      let tokenUsage: TokenUsage | null = null;
-      
+  if (reader) {
+    let result = '';
+    let tokenUsage: TokenUsage | null = null;
+    let iterationCount = 0;
+    const maxIterations = 10000; // Prevent infinite loops
+    const streamTimeout = 30000; // 30 second timeout
+    const startTime = Date.now();
+    
+    try {
       while (true) {
+        // Check for timeout
+        if (Date.now() - startTime > streamTimeout) {
+          console.warn('⏰ Stream processing timeout reached, terminating');
+          break;
+        }
+        
+        // Check for iteration limit
+        if (iterationCount >= maxIterations) {
+          console.warn('🔄 Maximum iterations reached, terminating to prevent infinite loop');
+          break;
+        }
+        
         const { done, value } = await reader.read();
         if (done) break;
         
         const chunk = decoder.decode(value);
         result += chunk;
+        
+        // Memory usage check - prevent excessive memory consumption
+        if (result.length > 10 * 1024 * 1024) { // 10MB limit
+          console.warn('💾 Memory limit reached, truncating stream');
+          result = result.substring(0, 10 * 1024 * 1024) + '\n\n[Stream truncated due to size limit]';
+          break;
+        }
         
         // Check for token usage marker
         const tokenMatch = result.match(/<!--TOKENS:(.+?)-->/);
@@ -73,7 +100,13 @@ export const analyzeLogsWithAI = async (
           tokenUsage,
           isComplete: false
         });
+        
+        iterationCount++;
       }
+    } catch (error) {
+      console.error('💥 Stream processing error:', error);
+      // Continue to final update even on error
+    }
       
       // Final update
       onUpdate({
@@ -83,13 +116,15 @@ export const analyzeLogsWithAI = async (
       });
     }
 
-    console.log('✅ AI analysis completed successfully');
-  } catch (error) {
+      console.log('✅ AI analysis completed successfully');
+    },
+    { logCount: request.logs.length, logFile: request.logFile }
+  ).catch(error => {
     console.error('💥 Error analyzing logs:', error);
     onUpdate({
       content: '❌ **Analysis Error**\n\nFailed to analyze logs. Please try again or check your internet connection.',
       tokenUsage: null,
       isComplete: true
     });
-  }
+  });
 }; 

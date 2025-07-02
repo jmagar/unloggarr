@@ -124,63 +124,44 @@ Format your response in clear markdown with emojis for better readability. Be sp
             controller.enqueue(new TextEncoder().encode(chunk));
           }
           
-          // Get the final result with usage information
-          const finalResult = await result;
-          console.log('🔢 Final result object:', finalResult);
-          console.log('🔢 Final result keys:', Object.keys(finalResult));
-          
-          let usage = null;
-          
-          // Try multiple ways to get usage information from AI SDK v5
-          try {
-            // First try to get usage directly
-            if (finalResult.usage) {
-              usage = finalResult.usage;
-              console.log('🔢 Token usage (direct):', usage);
-            }
-            // Try experimental usage property with type assertion
-            else if ((finalResult as any).experimental_providerMetadata?.anthropic?.usage) {
-              const anthropicUsage = (finalResult as any).experimental_providerMetadata.anthropic.usage;
-              usage = {
-                promptTokens: anthropicUsage.input_tokens || 0,
-                completionTokens: anthropicUsage.output_tokens || 0,
-                totalTokens: (anthropicUsage.input_tokens || 0) + (anthropicUsage.output_tokens || 0)
-              };
-              console.log('🔢 Token usage (anthropic metadata):', usage);
-            }
-            // Try response metadata with type assertion
-            else if ((finalResult as any).response?.headers) {
-              console.log('🔢 Response headers:', (finalResult as any).response.headers);
-            }
-            
-            // If usage is a Promise, await it
-            if (usage && typeof usage.then === 'function') {
-              usage = await usage;
-              console.log('🔢 Token usage (awaited):', usage);
-            }
-          } catch (error) {
-            console.log('🔢 Error getting usage:', error);
-          }
-          
-          // Send token usage as a final chunk with a special marker
-          if (usage && typeof usage === 'object') {
-            // Type assertion for usage object to handle AI SDK v5 structure
-            const usageObj = usage as any;
-            const tokenData = {
-              promptTokens: usageObj.inputTokens || usageObj.promptTokens || 0,
-              completionTokens: usageObj.outputTokens || usageObj.completionTokens || 0,
-              totalTokens: usageObj.totalTokens || (usageObj.inputTokens || 0) + (usageObj.outputTokens || 0)
-            };
-            console.log('🔢 Formatted token data:', tokenData);
-            
-            const tokenInfo = `\n\n<!--TOKENS:${JSON.stringify(tokenData)}-->`;
-            controller.enqueue(new TextEncoder().encode(tokenInfo));
+                  // Get the final result with simplified usage information
+        const finalResult = await result;
+        console.log('🔢 Final result received');
+        
+        let usage = null;
+        
+        // Simplified token usage extraction
+        try {
+          // Try to get usage directly from the result
+          if (finalResult.usage) {
+            usage = await Promise.resolve(finalResult.usage);
+            console.log('🔢 Token usage extracted:', usage);
           } else {
-            console.log('⚠️ No usage information available, sending zeros');
-            // Send empty token info so frontend knows analysis is complete
-            const tokenInfo = `\n\n<!--TOKENS:{"promptTokens":0,"completionTokens":0,"totalTokens":0}-->`;
-            controller.enqueue(new TextEncoder().encode(tokenInfo));
+            console.log('⚠️ No usage information available in result');
           }
+        } catch (error) {
+          console.log('🔢 Error extracting usage:', error);
+        }
+          
+                  // Send token usage as a final chunk with a special marker
+        const tokenData = usage ? {
+          promptTokens: (usage as any).promptTokens || (usage as any).inputTokens || 0,
+          completionTokens: (usage as any).completionTokens || (usage as any).outputTokens || 0,
+          totalTokens: (usage as any).totalTokens || 0
+        } : {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        };
+        
+        // Calculate total if not provided
+        if (tokenData.totalTokens === 0 && (tokenData.promptTokens > 0 || tokenData.completionTokens > 0)) {
+          tokenData.totalTokens = tokenData.promptTokens + tokenData.completionTokens;
+        }
+        
+        console.log('🔢 Final token data:', tokenData);
+        const tokenInfo = `\n\n<!--TOKENS:${JSON.stringify(tokenData)}-->`;
+        controller.enqueue(new TextEncoder().encode(tokenInfo));
           
           controller.close();
         } catch (error) {

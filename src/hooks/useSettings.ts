@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { debounce } from '../utils/cache';
 
 export interface AppSettings {
   theme: 'light' | 'dark';

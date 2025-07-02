@@ -1,5 +1,6 @@
 import { UnraidLogResponse, AvailableLogsResponse, LogEntry } from '../types';
 import { parseLogLine } from '../utils/logParser';
+import { cachedFetch } from '../utils/cache';
 
 /**
  * Fetch available log files from the API
@@ -8,35 +9,34 @@ import { parseLogLine } from '../utils/logParser';
 export const fetchAvailableLogFiles = async (): Promise<string[]> => {
   try {
     console.log('🔍 Fetching available log files...');
-    const response = await fetch('/api/available-logs', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'accept': 'application/json'
-      }
-    });
     
-    console.log('📡 Available log files response status:', response.status);
+    // Use cached fetch with 5-minute TTL since log files don't change frequently
+    const data: AvailableLogsResponse = await cachedFetch(
+      '/api/available-logs',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json'
+        }
+      },
+      5 * 60 * 1000, // 5 minutes TTL
+      'available-logs' // Custom cache key
+    );
     
-    if (response.ok) {
-      const data: AvailableLogsResponse = await response.json();
-      console.log('📄 Frontend received available logs response:', JSON.stringify(data, null, 2));
-      
-      if (data.success && data.available_logs && data.available_logs.length > 0) {
-        console.log('✅ Successfully loaded available log files:', data.available_logs);
-        return data.available_logs;
-      } else {
-        console.error('❌ Available logs API returned success=false or no log files');
-        console.error('Available logs details:', {
-          success: data.success,
-          availableLogsExists: !!data.available_logs,
-          availableLogsLength: data.available_logs?.length,
-          fullData: data
-        });
-        return [];
-      }
+    console.log('📄 Frontend received available logs response:', JSON.stringify(data, null, 2));
+    
+    if (data.success && data.available_logs && data.available_logs.length > 0) {
+      console.log('✅ Successfully loaded available log files:', data.available_logs);
+      return data.available_logs;
     } else {
-      console.error('❌ Failed to fetch available log files. Status:', response.status);
+      console.error('❌ Available logs API returned success=false or no log files');
+      console.error('Available logs details:', {
+        success: data.success,
+        availableLogsExists: !!data.available_logs,
+        availableLogsLength: data.available_logs?.length,
+        fullData: data
+      });
       return [];
     }
   } catch (error) {

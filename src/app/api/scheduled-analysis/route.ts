@@ -12,6 +12,79 @@ interface LogEntry {
   rawLine?: string;
 }
 
+// Track last analysis time for delta analysis
+let lastAnalysisTime: Date | null = null;
+const analyzedLogHashes = new Set<string>();
+
+// Simple hash function for log deduplication
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString();
+}
+
+// Filter logs for relevance and novelty
+function filterRelevantLogs(logs: LogEntry[], lastAnalysis: Date | null): LogEntry[] {
+  const now = new Date();
+  const cutoffTime = lastAnalysis || new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago if no last analysis
+  
+  return logs.filter(log => {
+    // Parse timestamp
+    const logTime = new Date(log.timestamp);
+    
+    // Only include logs newer than last analysis
+    if (logTime <= cutoffTime) {
+      return false;
+    }
+    
+    // Create hash for deduplication
+    const logHash = simpleHash(log.message + log.level);
+    
+    // Skip if we've already analyzed this log
+    if (analyzedLogHashes.has(logHash)) {
+      return false;
+    }
+    
+    // Add to analyzed set
+    analyzedLogHashes.add(logHash);
+    
+    // Prioritize errors and warnings
+    if (log.level === 'ERROR' || log.level === 'WARN') {
+      return true;
+    }
+    
+    // Include INFO logs that contain important keywords
+    if (log.level === 'INFO') {
+      const importantKeywords = ['fail', 'error', 'critical', 'timeout', 'disconnect', 'restart', 'crash'];
+      return importantKeywords.some(keyword => 
+        log.message.toLowerCase().includes(keyword)
+      );
+    }
+    
+    // Skip DEBUG logs unless they contain critical keywords
+    if (log.level === 'DEBUG') {
+      const criticalKeywords = ['critical', 'fatal', 'crash'];
+      return criticalKeywords.some(keyword => 
+        log.message.toLowerCase().includes(keyword)
+      );
+    }
+    
+    return false;
+  });
+}
+
+// Cleanup old hashes to prevent memory bloat
+function cleanupOldHashes() {
+  if (analyzedLogHashes.size > 10000) {
+    console.log('🧹 Cleaning up old log hashes to prevent memory bloat');
+    analyzedLogHashes.clear();
+  }
+}
+
 // Parse log line to extract level and other info
 const parseLogLine = (line: string, index: number): LogEntry => {
   let level: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' = 'INFO';
@@ -137,32 +210,57 @@ async function fetchUnraidLogs(logFile: string = '/var/log/syslog', tailLines: n
   }
 }
 
-// Analyze logs with AI and return summary
-async function analyzeLogsWithAI(logs: LogEntry[], logFile: string): Promise<{ summary: string; tokenUsage?: unknown }> {
+// Analyze logs with AI and return summary with optimized filtering
+async function analyzeLogsWithAI(logs: LogEntry[], logFile: string, isScheduled: boolean = false): Promise<{ summary: string; tokenUsage?: unknown; filteredCount: number; originalCount: number }> {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('Anthropic API key not configured');
   }
 
-  console.log(`🤖 Analyzing ${logs.length} log entries from ${logFile}...`);
+  const originalCount = logs.length;
+  console.log(`🤖 Starting analysis of ${originalCount} log entries from ${logFile}...`);
 
-  // Prepare log data for analysis
+  // Apply delta analysis and relevance filtering for scheduled runs
+  let filteredLogs = logs;
+  if (isScheduled) {
+    console.log(`🔍 Applying delta analysis (last analysis: ${lastAnalysisTime ? lastAnalysisTime.toISOString() : 'never'})`);
+    filteredLogs = filterRelevantLogs(logs, lastAnalysisTime);
+    console.log(`✂️ Filtered to ${filteredLogs.length} relevant/new logs (${((1 - filteredLogs.length / originalCount) * 100).toFixed(1)}% reduction)`);
+    
+    // Update last analysis time
+    lastAnalysisTime = new Date();
+    
+    // Cleanup old hashes periodically
+    cleanupOldHashes();
+  }
+
+  // If no new relevant logs, return early
+  if (filteredLogs.length === 0) {
+    return {
+      summary: '✅ **No New Issues Detected**\n\nAll recent logs have been previously analyzed or contain no significant issues requiring attention.',
+      tokenUsage: null,
+      filteredCount: 0,
+      originalCount
+    };
+  }
+
+  // Prepare log data for analysis with intelligent sampling
   let logSample: LogEntry[];
   
-  if (logs.length <= 1000) {
-    logSample = logs;
+  if (filteredLogs.length <= 500) { // Reduced from 1000 to save tokens
+    logSample = filteredLogs;
   } else {
-    // For larger datasets, use intelligent sampling
-    const errorLogs = logs.filter(log => log.level === 'ERROR');
-    const warnLogs = logs.filter(log => log.level === 'WARN');
-    const infoLogs = logs.filter(log => log.level === 'INFO');
-    const debugLogs = logs.filter(log => log.level === 'DEBUG');
+    // For larger datasets, prioritize by severity
+    const errorLogs = filteredLogs.filter(log => log.level === 'ERROR');
+    const warnLogs = filteredLogs.filter(log => log.level === 'WARN');
+    const infoLogs = filteredLogs.filter(log => log.level === 'INFO');
+    const debugLogs = filteredLogs.filter(log => log.level === 'DEBUG');
     
     logSample = [
-      ...errorLogs.slice(0, 200),
-      ...warnLogs.slice(0, 200),
-      ...infoLogs.slice(0, 300),
-      ...debugLogs.slice(0, 300),
-    ].slice(0, 1000);
+      ...errorLogs.slice(0, 150),  // Prioritize errors
+      ...warnLogs.slice(0, 150),   // Then warnings
+      ...infoLogs.slice(0, 100),   // Some info logs
+      ...debugLogs.slice(0, 100),  // Minimal debug logs
+    ].slice(0, 500); // Cap at 500 total logs
   }
   
   const logText = logSample.map((log: LogEntry) => 
@@ -222,7 +320,9 @@ Keep the summary under 500 words and prioritize actionable information. Use clea
 
   return {
     summary: fullText,
-    tokenUsage: usage
+    tokenUsage: usage,
+    filteredCount: logSample.length,
+    originalCount
   };
 }
 
@@ -259,38 +359,47 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Analyze logs with AI
-    const { summary, tokenUsage } = await analyzeLogsWithAI(logs, logFile);
+    // Analyze logs with AI using delta analysis for scheduled runs
+    const { summary, tokenUsage, filteredCount, originalCount } = await analyzeLogsWithAI(logs, logFile, true);
     
-    // Count critical issues for notification priority
+    // Count critical issues for notification priority (from filtered logs only for scheduled runs)
     const errorCount = logs.filter(log => log.level === 'ERROR').length;
     const warnCount = logs.filter(log => log.level === 'WARN').length;
+    const newErrorCount = filteredCount > 0 ? Math.ceil(errorCount * (filteredCount / originalCount)) : 0;
+    const newWarnCount = filteredCount > 0 ? Math.ceil(warnCount * (filteredCount / originalCount)) : 0;
     
-    // Determine notification priority based on issues found
+    // Determine notification priority based on new issues found
     let priority = 5; // Normal
-    if (errorCount > 0) {
+    if (newErrorCount > 0) {
       priority = 8; // High
-    } else if (warnCount > 5) {
+    } else if (newWarnCount > 5) {
       priority = 6; // Medium-High
+    } else if (filteredCount === 0) {
+      priority = 3; // Low - no new issues
     }
 
     // Send Gotify notification with analysis summary
     if (sendNotification) {
-      const title = errorCount > 0 
-        ? `🚨 Unraid Alert: ${errorCount} Errors Found`
-        : warnCount > 5
-        ? `⚠️ Unraid Warning: ${warnCount} Warnings`
-        : '✅ Unraid Status: System Normal';
+      const title = filteredCount === 0
+        ? '✅ Unraid Status: No New Issues'
+        : newErrorCount > 0 
+        ? `🚨 Unraid Alert: ${newErrorCount} New Errors`
+        : newWarnCount > 5
+        ? `⚠️ Unraid Warning: ${newWarnCount} New Warnings`
+        : '✅ Unraid Status: System Stable';
 
-      const notificationMessage = `📊 **Log Analysis Summary**
+      const tokenSavings = originalCount > 0 ? `${((1 - filteredCount / originalCount) * 100).toFixed(1)}% token savings` : '';
+      
+      const notificationMessage = `📊 **Optimized Log Analysis Summary**
 **File:** ${logFile}
-**Logs Analyzed:** ${logs.length}
-**Issues:** ${errorCount} errors, ${warnCount} warnings
+**Total Logs:** ${originalCount}
+**New/Relevant Logs:** ${filteredCount} ${tokenSavings ? `(${tokenSavings})` : ''}
+**Issues:** ${errorCount} total errors, ${warnCount} total warnings
 
 ${summary}
 
 ---
-*Automated analysis • ${new Date().toLocaleString()}*${tokenUsage ? ` • ${(tokenUsage as any).totalTokens || 0} tokens` : ''}`;
+*Delta analysis • ${new Date().toLocaleString()}*${tokenUsage ? ` • ${(tokenUsage as any).totalTokens || 0} tokens` : ''}`;
 
       await sendGotifyNotification(title, notificationMessage, priority);
     }
@@ -301,12 +410,17 @@ ${summary}
       success: true,
       analysis: {
         logFile,
-        logsAnalyzed: logs.length,
+        totalLogs: originalCount,
+        logsAnalyzed: filteredCount,
+        tokenSavings: originalCount > 0 ? ((1 - filteredCount / originalCount) * 100).toFixed(1) + '%' : '0%',
         errorCount,
         warnCount,
+        newErrorCount,
+        newWarnCount,
         summary,
         tokenUsage,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        deltaAnalysis: true
       }
     });
 

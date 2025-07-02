@@ -104,20 +104,37 @@ async function runScheduledAnalysis() {
   }
 }
 
-// Simple scheduler that checks every minute
+// Enhanced scheduler with proper cleanup and error handling
 let schedulerInterval: NodeJS.Timeout | null = null;
+let isSchedulerRunning = false;
 
 function startScheduler() {
+  // Prevent multiple scheduler instances
   if (schedulerInterval) {
-    clearInterval(schedulerInterval);
+    console.log('⚠️ Scheduler already running, stopping previous instance');
+    stopScheduler();
   }
   
   scheduleInfo.enabled = true;
   scheduleInfo.nextRun = getNextRunTime(scheduleInfo.schedule);
   
-  schedulerInterval = setInterval(() => {
-    if (scheduleInfo.enabled && shouldRunNow(scheduleInfo.schedule)) {
-      runScheduledAnalysis();
+  schedulerInterval = setInterval(async () => {
+    try {
+      // Prevent concurrent executions
+      if (isSchedulerRunning) {
+        console.log('⏳ Previous scheduler task still running, skipping this interval');
+        return;
+      }
+      
+      if (scheduleInfo.enabled && shouldRunNow(scheduleInfo.schedule)) {
+        isSchedulerRunning = true;
+        await runScheduledAnalysis();
+      }
+    } catch (error) {
+      console.error('💥 Scheduler error:', error);
+      scheduleInfo.status = 'error';
+    } finally {
+      isSchedulerRunning = false;
     }
   }, 60000); // Check every minute
   
@@ -133,6 +150,7 @@ function stopScheduler() {
   scheduleInfo.enabled = false;
   scheduleInfo.nextRun = null;
   scheduleInfo.status = 'stopped';
+  isSchedulerRunning = false;
   
   console.log('⏹️ Scheduler stopped');
 }
