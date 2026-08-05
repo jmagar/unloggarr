@@ -168,7 +168,7 @@ src/
 - **API Key Management**: Secure environment variable handling.
 - **Network Isolation**: Container network segmentation.
 - **SSL Verification**: Configurable for self-signed certificates.
-- **No External Dependencies**: Self-contained deployment (mcpo.tootie.tv eliminated).
+- **No External Dependencies**: Self-contained deployment (mcpo.example.internal eliminated).
 
 ### Performance Constraints
 - **Log Sampling**: Up to 10,000 log entries (configurable) for AI analysis, with error/warning prioritization.
@@ -202,7 +202,7 @@ unloggarr-mcpo:
 - **Health Checks**: Container health monitoring.
 
 ### Migration Strategy
-- **External Dependency Elimination**: Migrated from mcpo.tootie.tv to local services ✅ COMPLETED.
+- **External Dependency Elimination**: Migrated from mcpo.example.internal to local services ✅ COMPLETED.
 - **Local Service Replacement**: Self-hosted MCPO proxy.
 - **Configuration Compatibility**: Maintained existing .env.local format.
 

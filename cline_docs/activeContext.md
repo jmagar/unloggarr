@@ -65,7 +65,7 @@
 │ Port 6970: MCP  │    │                 │
 └─────────────────┘    └─────────────────┘
 ```
-*(External mcpo.tootie.tv dependency has been removed)*
+*(External mcpo.example.internal dependency has been removed)*
 
 ## Immediate Next Steps:
 1.  **Diagnose MCP Server ASGI Error**: Investigate `unraid-mcp-server.py` to find the cause of the `RuntimeError`.
@@ -92,7 +92,7 @@
 🎯 **UI Priority**: Dark mode readability issues resolved (secondary to server stability).
 🎯 **Architecture**: Modular components fully functional.
 🎯 **Container Goal**: `docker compose up -d` starts fully functional unloggar.
-🎯 **Independence**: External mcpo.tootie.tv dependency eliminated. ✅ ACHIEVED
+🎯 **Independence**: External mcpo.example.internal dependency eliminated. ✅ ACHIEVED
 
 ## Current Capabilities
 The LogViewer now has both architectural excellence and enhanced UI:
