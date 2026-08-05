@@ -176,7 +176,7 @@ The unloggar application follows a modern containerized microservices architectu
 - **API Key Management**: Secure Unraid API key handling via environment variables
 - **SSL Configuration**: Configurable SSL verification for self-signed certificates
 - **Container Isolation**: Network segmentation via Docker networks
-- **No External Dependencies**: Self-contained deployment (mcpo.tootie.tv eliminated)
+- **No External Dependencies**: Self-contained deployment (mcpo.example.internal eliminated)
 
 ### Monitoring & Observability
 - **Health Checks**: Built-in Docker health check endpoints
@@ -232,7 +232,7 @@ The unloggar application follows a modern containerized microservices architectu
 - **Network Isolation**: Services communicate via internal Docker networks
 
 ## Migration Strategy
-- **External Dependency Elimination**: Migrated from mcpo.tootie.tv to local services ✅ COMPLETED
+- **External Dependency Elimination**: Migrated from mcpo.example.internal to local services ✅ COMPLETED
 - **Zero-Downtime Transition**: Dual endpoint support was used during migration
 - **Configuration Compatibility**: Maintained existing .env.local format
 - **Service Independence**: Each service can be updated independently
